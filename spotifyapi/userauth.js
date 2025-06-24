@@ -21,7 +21,7 @@ function generateRandomString(length) {
 // /login endpoint
 router.get('/login', function (req, res) {
   const state = generateRandomString(16);
-  const scope = 'user-read-private user-read-email';
+  const scope = 'user-read-private user-read-email playlist-modify-private playlist-modify-public';
 
   res.redirect('https://accounts.spotify.com/authorize?' +
     querystring.stringify({
@@ -76,6 +76,30 @@ router.get('/callback', function (req, res) {
         }));
     }
   });
+});
+
+
+router.get('/profile', async function (req, res) {
+  const authHeader = req.headers['authorization']; 
+  const token = authHeader && authHeader.split(' ')[1]; 
+
+  if (!token) {
+    return res.status(401).json({ error: 'Missing access token' });
+  }
+
+  try {
+    const result = await fetch("https://api.spotify.com/v1/me", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    const data = await result.json();
+    return res.status(200).json(data);
+  } catch (err) {
+    return res.status(500).json({ error: 'Something went wrong', details: err });
+  }
 });
 
 module.exports = router;
