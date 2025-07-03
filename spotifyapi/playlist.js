@@ -1,18 +1,15 @@
 const express = require('express');
-
-
-
+const userauth = require('./userauth'); 
 
 const router = express.Router();
 
+router.get('/getplaylists', userauth.ensureValidAccessToken, async function (req, res) {
+  const token = userauth.tokens.access_token;
 
-
-router.get('/getplaylists', async function (req, res) {
-  const authHeader = req.headers['authorization']; 
-  const token = authHeader && authHeader.split(' ')[1]; 
+  console.log("token is:", token);
 
   if (!token) {
-    return res.status(401).json({ error: 'Missing access token' });
+    return res.status(401).json({ error: 'You must log in first via /auth/login' });
   }
 
   try {
@@ -26,20 +23,18 @@ router.get('/getplaylists', async function (req, res) {
     const data = await result.json();
     return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ error: 'Something went wrong', details: err });
+    return res.status(500).json({ error: 'Something went wrong', details: err.message });
   }
 });
 
-
-router.post('/createplaylist', async function (req, res) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+router.post('/createplaylist', userauth.ensureValidAccessToken, async function (req, res) {
+  const token = userauth.tokens.access_token;
 
   if (!token) {
-    return res.status(401).json({ error: 'Missing access token' });
+    return res.status(401).json({ error: 'You must log in first via /auth/login' });
   }
 
-  const {user_id, name, description, isPublic } = req.body;
+  const { user_id, name, description, isPublic } = req.body;
 
   if (!name) {
     return res.status(400).json({ error: 'name is required' });
@@ -53,7 +48,7 @@ router.post('/createplaylist', async function (req, res) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        name: name,
+        name,
         description: description || '',
         public: isPublic ?? false
       })
@@ -71,6 +66,4 @@ router.post('/createplaylist', async function (req, res) {
   }
 });
 
-
 module.exports = router;
-    

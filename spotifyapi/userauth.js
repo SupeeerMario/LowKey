@@ -3,8 +3,11 @@ const request = require('request');
 const querystring = require('querystring');
 const crypto = require('crypto');
 const dotenv = require('dotenv');
-
-
+let tokens = {
+  access_token: null,
+  refresh_token: null,
+  expires_at: null 
+};
 dotenv.config();
 
 
@@ -61,30 +64,81 @@ router.get('/callback', function (req, res) {
 
   request.post(authOptions, function (error, response, body) {
     if (!error && response.statusCode === 200) {
-      const access_token = body.access_token;
-      const refresh_token = body.refresh_token;
+      const { access_token, refresh_token, expires_in } = body;
 
-      res.redirect('/#' +
-        querystring.stringify({
-          access_token: access_token,
-          refresh_token: refresh_token
-        }));
+      tokens.access_token = access_token;
+      tokens.refresh_token = refresh_token;
+      tokens.expires_at = Date.now() + expires_in * 1000;
+
+      console.log("access token is:", access_token);
+      console.log("refresh token is:", refresh_token);
+      console.log("expires at:", new Date(tokens.expires_at).toLocaleString());
+
+      res.redirect('/#');
     } else {
-      res.redirect('/#' +
-        querystring.stringify({
-          error: 'invalid_token'
-        }));
+      res.redirect('/#' + querystring.stringify({ error: 'invalid_token' }));
     }
   });
 });
 
+async function refreshAccessToken(refresh_token) {
+  return new Promise((resolve, reject) => {
+    const authOptions = {
+      url: 'https://accounts.spotify.com/api/token',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(client_id + ':' + client_secret).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      form: {
+        grant_type: 'refresh_token',
+        refresh_token: refresh_token
+      },
+      json: true
+    };
 
-router.get('/profile', async function (req, res) {
-  const authHeader = req.headers['authorization']; 
-  const token = authHeader && authHeader.split(' ')[1]; 
+    request.post(authOptions, function (error, response, body) {
+      if (!error && response.statusCode === 200) {
+        const { access_token, expires_in } = body;
+        tokens.access_token = access_token;
+        tokens.expires_at = Date.now() + expires_in * 1000;
+        resolve(access_token);
+      } else {
+        reject(body || error);
+      }
+    });
+  });
+}
+
+async function ensureValidAccessToken(req, res, next) {
+  try {
+    if (!tokens.access_token || !tokens.refresh_token || !tokens.expires_at) {
+      return res.status(401).json({ error: 'You must log in first via /auth/login' });
+    }
+
+    console.log("Now:", Date.now());
+    console.log("Expires At:", tokens.expires_at);
+
+    if (Date.now() >= tokens.expires_at) {
+      console.log('Access token expired, refreshing...');
+      await refreshAccessToken(tokens.refresh_token);
+      console.log('New token:', tokens.access_token);
+    } else {
+      console.log('Access token still valid.');
+    }
+
+    next();
+  } catch (err) {
+    console.error('Token refresh failed:', err);
+    res.status(401).json({ error: 'Failed to refresh token', details: err });
+  }
+}
+
+
+router.get('/profile', ensureValidAccessToken, async function (req, res) {
+  const token = tokens.access_token;
 
   if (!token) {
-    return res.status(401).json({ error: 'Missing access token' });
+    return res.status(401).json({ error: 'Access token not available on server' });
   }
 
   try {
@@ -102,5 +156,10 @@ router.get('/profile', async function (req, res) {
   }
 });
 
-module.exports = router;
-    
+
+module.exports = {
+  router,
+  ensureValidAccessToken,
+  tokens 
+};    
+
