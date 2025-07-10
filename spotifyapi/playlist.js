@@ -114,4 +114,59 @@ router.post('/addtoplaylist', userauth.ensureValidAccessToken, async function (r
   }
 })
 
+
+router.delete('/deletefromplaylist', userauth.ensureValidAccessToken, async function (req, res) {
+  const token = req.token;
+
+    if(!token){
+    return res.status(400).json({ error: 'You must log in first via /auth/login' });
+  }
+
+  const { playlist_id, tracks, snapshot_id } = req.body;
+
+    if (!playlist_id) {
+    return res.status(400).json({ error: 'playlist_id is required' });
+  }
+
+  if (!tracks || !Array.isArray(tracks) || tracks.length === 0) {
+    return res.status(400).json({ error: 'tracks array is required and must contain at least one track object' });
+  }
+
+  // Validate track objects have uri property
+  for (const track of tracks) {
+    if (!track.uri) {
+      return res.status(400).json({ error: 'Each track object must have a uri property' });
+    }
+  }
+
+  try{
+    const requestBody = {
+      tracks: tracks
+    };
+
+    if(snapshot_id){
+      requestBody.snapshot_id = snapshot_id;
+    }
+    const result = await fetch(`https://api.spotify.com/v1/playlists/${playlist_id}/tracks`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    const data = await result.json();
+    
+    if (result.status === 200) {
+      return res.status(200).json(data);
+    } else {
+      return res.status(result.status).json({ error: 'Failed to remove tracks from playlist', details: data });
+    }
+  } catch (err) {
+    return res.status(500).json({ error: 'Something went wrong', details: err });
+  }
+});
+
+
 module.exports = router;
