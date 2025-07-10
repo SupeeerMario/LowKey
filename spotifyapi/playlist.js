@@ -4,7 +4,7 @@ const userauth = require('./userauth');
 const router = express.Router();
 
 router.get('/getplaylists', userauth.ensureValidAccessToken, async function (req, res) {
-  const token = userauth.tokens.access_token;
+  const token = req.token;
 
   console.log("token is:", token);
 
@@ -28,7 +28,7 @@ router.get('/getplaylists', userauth.ensureValidAccessToken, async function (req
 });
 
 router.post('/createplaylist', userauth.ensureValidAccessToken, async function (req, res) {
-  const token = userauth.tokens.access_token;
+  const token = req.token;
 
   if (!token) {
     return res.status(401).json({ error: 'You must log in first via /auth/login' });
