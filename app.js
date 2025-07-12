@@ -14,5 +14,8 @@ app.use(cookieParser());
 app.use('/auth', spotifyAuthRoutes.router);
 app.use('/spotify', spotifyplaylistRoutes);
 
+app.get('/ping', (req, res) => {
+  res.json({ message: "Server is alive!" });
+});
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
