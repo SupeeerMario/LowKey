@@ -37,10 +37,15 @@ app.use(cookieParser());
 app.use('/auth', spotifyAuthRoutes.router);
 app.use('/spotify', spotifyplaylistRoutes);
 
-// ✅ Debug route
+// Debug route
 app.get('/ping', (req, res) => {
   res.json({ message: "Server is alive!" });
 });
 
-// ✅ Export for Vercel/serverless
+// Root route
+app.get('/', (req, res) => {
+  res.json({ message: "Backend API is running!" });
+});
+
+// Export for Vercel/serverless
 module.exports = app;
