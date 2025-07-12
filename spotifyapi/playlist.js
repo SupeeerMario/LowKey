@@ -3,6 +3,8 @@ const userauth = require('./userauth');
 
 const router = express.Router();
 
+
+// /Get user Playlists
 router.get('/getplaylists', userauth.ensureValidAccessToken, async function (req, res) {
   const token = req.token;
 
@@ -27,6 +29,67 @@ router.get('/getplaylists', userauth.ensureValidAccessToken, async function (req
   }
 });
 
+
+// /Get Playlists Tracks
+router.get('/getplaylisttracks/:playlist_id', userauth.ensureValidAccessToken, async function (req, res){
+  const token = req.token;
+
+  if(!token){
+    return res.status(401).json({ error: 'You must log in first via /auth/login' });
+  }
+
+  const playlist_id = req.params.playlist_id;
+
+  if(!playlist_id){
+    return res.status(400).json({error: 'Playlist_id is required'});
+  }
+  try{
+    const response = await fetch(`https://api.spotify.com/v1/playlists/${playlist_id}/tracks`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if(!response.ok) {
+      
+      const errData = await response.json();
+      return res.status(response.status).json({ error: errData });
+    }
+
+    const data = await response.json();
+
+      const formattedTracks = data.items.map(item => {
+      const track = item.track;
+      const artist = track.artists.map(artist=> artist.name).join(', ');
+      const album = track.album.name;
+      const durationMIN = track.duration_ms;
+
+      const minutes = Math.floor(durationMIN / 60000);
+      const seconds = Math.floor((durationMIN % 60000) / 1000).toString().padStart(2, '0');
+
+      return {
+        name: track.name,
+        artist: artist,
+        album: album,
+        duration: `${minutes}:${seconds}`,
+        spotify_url: track.external_urls.spotify,
+        album_cover: track.album.images[0]?.url || null
+
+      };
+
+    })
+
+    
+    return res.status(200).json({ tracks: formattedTracks });
+  }catch(err){
+    return res.status(500).json({ error: 'Something went wrong', details: err.message });
+  }
+})
+
+
+
+// /Create a new Playlist
 router.post('/createplaylist', userauth.ensureValidAccessToken, async function (req, res) {
   const token = req.token;
 
@@ -67,6 +130,7 @@ router.post('/createplaylist', userauth.ensureValidAccessToken, async function (
 });
 
 
+// /Add a track to a Playlist
 router.post('/addtoplaylist', userauth.ensureValidAccessToken, async function (req, res) {
   const token = req.token;
 
@@ -115,6 +179,8 @@ router.post('/addtoplaylist', userauth.ensureValidAccessToken, async function (r
 })
 
 
+
+// /Delete a track from a Playlist
 router.delete('/deletefromplaylist', userauth.ensureValidAccessToken, async function (req, res) {
   const token = req.token;
 
